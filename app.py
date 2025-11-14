@@ -609,7 +609,7 @@ def show_main_menu():
         st.markdown('<div class="big-menu">', unsafe_allow_html=True)
         out_btn = st.button("임가공 출고 (1WP → 1JO)", use_container_width=True, key="btn_out")
         st.write("")
-        in_btn = st.button("임가공 입고 (1JO → 1WP)", use_container_width=True, key="btn_in")
+        in_btn = st.button("임가공 입고 (1JO → 1FGCK)", use_container_width=True, key="btn_in")
         st.write("")
         logout_btn = st.button("로그아웃", use_container_width=True, key="btn_logout")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -645,9 +645,9 @@ def show_transfer_page(mode: str):
         from_wh = "1WP"
         to_wh = "1JO"
     else:
-        title = "임가공 입고 (1JO → 1WP)"
+        title = "임가공 입고 (1JO → 1FGCK)"
         from_wh = "1JO"
-        to_wh = "1WP"
+        to_wh = "1FGCK"
 
     rows_key = f"transfer_rows_{from_wh}_{to_wh}"
     if rows_key not in st.session_state:
