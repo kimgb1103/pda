@@ -5,7 +5,7 @@ from datetime import datetime
 
 BASE_URL = "https://qf3.qfactory.biz:8000"
 
-LOGIN_URL = f"{BASE_URL}/common/login/post-login"  # ★
+LOGIN_URL = f"{BASE_URL}/common/login/post-login"
 STOCK_DETAIL_URL = f"{BASE_URL}/inv/stock-onhand-lot/detail-list"
 WAREHOUSE_LIST_URL = f"{BASE_URL}/inv/warehouse/list"
 STOCK_TRANSFER_LIST_URL = f"{BASE_URL}/inv/stock-transfer-warehouse/list"
@@ -294,9 +294,7 @@ def perform_transfer(rows, from_wh_code: str, to_wh_code: str):
         transaction_date = now.strftime("%Y-%m-%d %H:%M:%S")
         period_date = now.strftime("%Y-%m")
 
-        records_u = []
-        records_u2 = []
-
+        # 여러 개의 행이 있어도, MES 에는 행별로 1건씩 순차 전송
         for row in rows:
             item_code = row["itemCode"]
             lot_code = row["lotCode"]
@@ -330,7 +328,7 @@ def perform_transfer(rows, from_wh_code: str, to_wh_code: str):
             header_obj["projectId"] = header.get("projectId") or 0
 
             # 거래수량 = LOT 이동수량 합계와 같아야 하므로, 기본단위수량(primaryQuantity)을 이동수량으로 맞춤
-            header_obj["primaryQuantity"] = float(move_qty)  # ★
+            header_obj["primaryQuantity"] = float(move_qty)
 
             # 프론트에서 사용하는 id / row-active 필드 추가 (서버가 참조할 수도 있으므로 형태만 맞춤)
             if "id" not in header_obj:
@@ -359,87 +357,87 @@ def perform_transfer(rows, from_wh_code: str, to_wh_code: str):
             header_obj["lotCount"] = 1
             header_obj["transferItemId"] = header.get("itemId")
             header_obj["transferPlantId"] = header.get("plantId", plant_id)
-            header_obj["webUrlId"] = 1365
+            header_obj["webUrlId"] = 13648
             header_obj["interfaceFlag"] = "N"
 
-            records_u.append(header_obj)
+            records_u = [header_obj]
 
             lot_obj = dict(lot_row)
             if "id" not in lot_obj:
-                lot_obj["id"] = f"python-lot-{lot_obj.get('lotId') or lot_obj.get('lotCode')}"  # ★
-            lot_obj["editStatus"] = "U"  # ★
-            lot_obj["moveQuantity"] = float(move_qty)  # ★
-            lot_obj["onhandStockId"] = header.get("onhandStockId")  # ★
-            records_u2.append(lot_obj)
+                lot_obj["id"] = f"python-lot-{lot_obj.get('lotId') or lot_obj.get('lotCode')}"
+            lot_obj["editStatus"] = "U"
+            lot_obj["moveQuantity"] = float(move_qty)
+            lot_obj["onhandStockId"] = header.get("onhandStockId")
+            records_u2 = [lot_obj]
 
-        payload = {
-            "recordsI": json.dumps([], ensure_ascii=False),  # ★
-            "recordsU": json.dumps(records_u, ensure_ascii=False),  # ★
-            "recordsU2": json.dumps(records_u2, ensure_ascii=False),  # ★
-            "recordsD": json.dumps([], ensure_ascii=False),  # ★
-            "menuTreeId": "13648",  # ★
-            "companyCode": company_code,  # ★
-            "companyId": company_id,  # ★
-            "languageCode": language_code,  # ★
-        }
+            payload = {
+                "recordsI": json.dumps([], ensure_ascii=False),
+                "recordsU": json.dumps(records_u, ensure_ascii=False),
+                "recordsU2": json.dumps(records_u2, ensure_ascii=False),
+                "recordsD": json.dumps([], ensure_ascii=False),
+                "menuTreeId": "13648",
+                "companyCode": company_code,
+                "companyId": company_id,
+                "languageCode": language_code,
+            }
 
-        # 디버그: SAVE 요청 payload를 콘솔에 출력
-        print("=== DEBUG SAVE payload ===")
-        try:
-            print(json.dumps(payload, ensure_ascii=False))
-        except Exception:
-            print(payload)
-        print("=== END DEBUG SAVE payload ===")
+            # 디버그: SAVE 요청 payload를 콘솔에 출력
+            print("=== DEBUG SAVE payload ===")
+            try:
+                print(json.dumps(payload, ensure_ascii=False))
+            except Exception:
+                print(payload)
+            print("=== END DEBUG SAVE payload ===")
 
-        save_data = mes_post(STOCK_TRANSFER_SAVE_URL, payload)
-        if not isinstance(save_data, dict):
-            raise RuntimeError(f"창고이동 SAVE 응답 형식이 올바르지 않습니다: {save_data!r}")
+            save_data = mes_post(STOCK_TRANSFER_SAVE_URL, payload)
+            if not isinstance(save_data, dict):
+                raise RuntimeError(f"창고이동 SAVE 응답 형식이 올바르지 않습니다: {save_data!r}")
 
-        # 디버그: SAVE 응답
-        print("=== DEBUG SAVE response ===")
-        try:
-            print(json.dumps(save_data, ensure_ascii=False))
-        except Exception:
-            print(save_data)
-        print("=== END DEBUG SAVE response ===")
+            # 디버그: SAVE 응답
+            print("=== DEBUG SAVE response ===")
+            try:
+                print(json.dumps(save_data, ensure_ascii=False))
+            except Exception:
+                print(save_data)
+            print("=== END DEBUG SAVE response ===")
 
-        data_field = save_data.get("data")
-        if isinstance(data_field, dict):
-            transfer_tmp_id = data_field.get("list")  # {"list": 14720} 형태
-        else:
-            transfer_tmp_id = data_field
-        if not transfer_tmp_id:
-            st.error("save 처리 후 transferTmpId 를 받지 못했습니다.")
-            return
+            data_field = save_data.get("data")
+            if isinstance(data_field, dict):
+                transfer_tmp_id = data_field.get("list")  # {"list": 14720} 형태
+            else:
+                transfer_tmp_id = data_field
+            if not transfer_tmp_id:
+                st.error("save 처리 후 transferTmpId 를 받지 못했습니다.")
+                return
 
-        transfer_payload = {
-            "companyId": company_id,
-            "transferTmpId": transfer_tmp_id,
-            "companyCode": company_code,
-            "languageCode": language_code,
-        }
+            transfer_payload = {
+                "companyId": company_id,
+                "transferTmpId": transfer_tmp_id,
+                "companyCode": company_code,
+                "languageCode": language_code,
+            }
 
-        # 디버그: TRANSFER payload
-        print("=== DEBUG TRANSFER payload ===")
-        try:
-            print(json.dumps(transfer_payload, ensure_ascii=False))
-        except Exception:
-            print(transfer_payload)
-        print("=== END DEBUG TRANSFER payload ===")
+            # 디버그: TRANSFER payload
+            print("=== DEBUG TRANSFER payload ===")
+            try:
+                print(json.dumps(transfer_payload, ensure_ascii=False))
+            except Exception:
+                print(transfer_payload)
+            print("=== END DEBUG TRANSFER payload ===")
 
-        transfer_resp = mes_post(STOCK_TRANSFER_TRANSFER_URL, transfer_payload)
+            transfer_resp = mes_post(STOCK_TRANSFER_TRANSFER_URL, transfer_payload)
 
-        # 디버그: TRANSFER 응답
-        print("=== DEBUG TRANSFER response ===")
-        try:
-            print(json.dumps(transfer_resp, ensure_ascii=False))
-        except Exception:
-            print(transfer_resp)
-        print("=== END DEBUG TRANSFER response ===")
+            # 디버그: TRANSFER 응답
+            print("=== DEBUG TRANSFER response ===")
+            try:
+                print(json.dumps(transfer_resp, ensure_ascii=False))
+            except Exception:
+                print(transfer_resp)
+            print("=== END DEBUG TRANSFER response ===")
 
         st.success("창고이동이 완료되었습니다.")
         st.session_state[f"transfer_rows_{from_wh_code}_{to_wh_code}"] = []
-    except Exception as e:
+    except Exception:
         # 여기서 전체 Traceback 과 주요 상태를 PowerShell 에 출력
         import traceback
         print("========== PERFORM_TRANSFER DEBUG TRACEBACK ==========")
@@ -745,7 +743,6 @@ def show_transfer_page(mode: str):
             table_data.append(
                 {
                     "No": idx,
-                    "바코드": r["barcode"],
                     "품목코드": r["itemCode"],
                     "품목명": r.get("itemName"),
                     "LOT NO": r["lotCode"],
